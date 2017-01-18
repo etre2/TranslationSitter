@@ -15,6 +15,10 @@
     "phpoffice/phpexcel": "^1.8"
   },
   "extra":{
-    "magento-root-dir":"./"
+    "magento-root-dir":"./",
+    "map":[
+      ["src/app/etc/modules/Etre_TranslationSitter.xml", "app/etc/modules/Etre_TranslationSitter.xml"],
+      ["src/app/code/local/TranslationSitter", "app/code/local/TranslationSitter"]
+    ]
   }
 }
