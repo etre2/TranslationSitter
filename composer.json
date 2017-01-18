@@ -1,0 +1,20 @@
+{
+  "name": "etre2/translation-sitter",
+  "description": "Babysit Magento Translations",
+  "type": "magento-module",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Tyler Mills",
+      "email": "tylerssn@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=5.6.0",
+    "magento-hackathon/magento-composer-installer": "*",
+    "phpoffice/phpexcel": "^1.8"
+  },
+  "extra":{
+    "magento-root-dir":"./"
+  }
+}

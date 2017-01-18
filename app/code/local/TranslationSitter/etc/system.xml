@@ -1,0 +1,187 @@
+<?xml version="1.0"?>
+<config>
+    <sections>
+        <system translate="label">
+            <groups>
+                <translationsitter translate="label">
+                    <label>Translation Sitter</label>
+                    <frontend_type>text</frontend_type>
+                    <sort_order>0</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <show_in_store>1</show_in_store>
+                    <comment>
+                        <![CDATA[
+                                <span class="">If a translation is not found when loaded, TranslationSitter will log that line and, optionally, download and install the missing translation.</span>]]>
+                    </comment>
+                    <fields>
+                        <isEnabled translate="label">
+                            <label><![CDATA[<strong>Enable</strong>]]></label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>0</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </isEnabled>
+                        <isFrontendLogEnabled>
+                            <label><![CDATA[Log missing translations (Frontend)]]></label>
+                            <sort_order>10</sort_order>
+                            <tooltip>If a translation is missing for the frontend, log the missing translation.</tooltip>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends>
+                                <isEnabled>1</isEnabled>
+                            </depends>
+                        </isFrontendLogEnabled>
+                        <isFrontendAutoTranslateEnabled>
+                            <label><![CDATA[Auto-Translate (Frontend)]]></label>
+                            <sort_order>15</sort_order>
+                            <tooltip>If a translation is missing for the frontend, automatically translate and save the translation.</tooltip>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends>
+                                <isEnabled>1</isEnabled>
+                                <isFrontendLogEnabled>1</isFrontendLogEnabled>
+                            </depends>
+                        </isFrontendAutoTranslateEnabled>
+                        <isAdminLogEnabled>
+                            <label><![CDATA[Log missing translations (Admin)]]></label>
+                            <sort_order>20</sort_order>
+                            <tooltip>If a translation is missing for the frontend, log the missing translation.</tooltip>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends>
+                                <isEnabled>1</isEnabled>
+                            </depends>
+                        </isAdminLogEnabled>
+                        <isAdminAutoTranslateEnabled>
+                            <label><![CDATA[Auto-Translate (Admin)]]></label>
+                            <sort_order>25</sort_order>
+                            <tooltip>If a translation is missing for the frontend, automatically translate and save the translation.</tooltip>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends>
+                                <isEnabled>1</isEnabled>
+                                <isAdminLogEnabled>1</isAdminLogEnabled>
+                            </depends>
+                        </isAdminAutoTranslateEnabled>
+                        <!--<caseThresholdNotification>
+                            <label><![CDATA[<strong>Case Notification</strong>]]></label>
+                            <tooltip>Message to display in cart when case threshold  exceeded.</tooltip>
+                            <frontend_type>text</frontend_type>
+                            <validate>required-entry</validate>
+                            <sort_order>11</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends><isEnabled>1</isEnabled></depends>
+                        </caseThresholdNotification>
+                        <bottleThreshold>
+                            <label><![CDATA[<strong>Bottles Threshold</strong>]]></label>
+                            <tooltip>Display alert when quantity of bottles in cart is equal to or greater than this value.</tooltip>
+                            <frontend_type>text</frontend_type>
+                            <validate>validate-number required-entry</validate>
+                            <sort_order>20</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends><isEnabled>1</isEnabled></depends>
+                        </bottleThreshold>
+                        <bottleThresholdNotification>
+                            <label><![CDATA[<strong>Bottle Notification</strong>]]></label>
+                            <tooltip>Message to display in cart when bottle threshold exceeded.</tooltip>
+                            <frontend_type>text</frontend_type>
+                            <validate>required-entry</validate>
+                            <sort_order>21</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends><isEnabled>1</isEnabled></depends>
+                        </bottleThresholdNotification>
+                        <caseBottleThresholdNotification>
+                            <label><![CDATA[<strong>Case & Bottle Threshold</strong>]]></label>
+                            <tooltip>Message to display in cart when bottle and case threshold exceeded.</tooltip>
+                            <frontend_type>text</frontend_type>
+                            <validate>required-entry</validate>
+                            <sort_order>30</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends><isEnabled>1</isEnabled></depends>
+                        </caseBottleThresholdNotification>
+                        <emailNotification>
+                            <label><![CDATA[<strong>Email Notification</strong>]]></label>
+                            <tooltip>Message to display in email when bottle or case threshold exceeded.</tooltip>
+                            <frontend_type>text</frontend_type>
+                            <validate>required-entry</validate>
+                            <sort_order>31</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                            <depends><isEnabled>1</isEnabled></depends>
+                        </emailNotification>-->
+                    </fields>
+                </translationsitter>
+            </groups>
+        </system>
+        <trans_email translate="label" module="trans_email">
+            <groups>
+                <order_threshold_notification translate="label">
+                    <comment>
+                        <![CDATA[
+                        <span class="notice"></span>]]>
+                    </comment>
+                    <label>Order Threshold Notification</label>
+                    <frontend_type>text</frontend_type>
+                    <sort_order>60</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <show_in_store>1</show_in_store>
+                    <fields>
+                        <recipient_email translate="label">
+                            <label>Recipient Email</label>
+                            <frontend_type>text</frontend_type>
+                            <validate>validate-email</validate>
+                            <sort_order>2</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </recipient_email>
+                        <recipient_name translate="label">
+                            <label>Recipient Name</label>
+                            <frontend_type>text</frontend_type>
+                            <validate>required-entry</validate>
+                            <sort_order>1</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+                        </recipient_name>
+                        <email_template translate="label">
+                            <label>Email Template</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_email_template</source_model>
+                            <sort_order>30</sort_order>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <show_in_store>1</show_in_store>
+
+                        </email_template>
+                    </fields>
+                </order_threshold_notification>
+            </groups>
+        </trans_email>
+    </sections>
+</config>
