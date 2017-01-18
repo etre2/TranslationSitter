@@ -18,7 +18,7 @@
     "magento-root-dir":"./",
     "map":[
       ["src/app/etc/modules/Etre_TranslationSitter.xml", "app/etc/modules/Etre_TranslationSitter.xml"],
-      ["src/app/code/local/TranslationSitter", "app/code/local/TranslationSitter"]
+      ["src/app/code/local/Etre/TranslationSitter", "app/code/local/Etre/TranslationSitter"]
     ]
   }
 }
