@@ -128,6 +128,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     {
         if ($this->uploadedFileHasProperName($inputFileId = 'translationsitter_source')) {
             try {
+                ini_set("display_errors",1);
                 $path = Mage::getBaseDir('var') . DS . 'etre_imported_translations' . DS;  //desitnation directory
                 /** Make the import directory if it doesn't exist */
                 $fname = strtotime('now') . '_' . $_FILES[$inputFileId]['name']; //file name
@@ -137,7 +138,9 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
                 $uploader->setAllowRenameFiles(true); //if true, uploaded file's name will be changed, if file with the same name already exists directory.
                 $uploader->setFilesDispersion(false);
                 if ($uploader->save($path, $fname)) {
-
+                    $file = PHPExcel_IOFactory::load($path.$fname);
+                    $activeSheet = $file->getActiveSheet();
+                    dd($activeSheet->toArray());
                     $csv = new Varien_File_Csv();
                     $csv->getData($path.$fname);
                     dd($csv);
