@@ -2,7 +2,8 @@
 
 class Etre_TranslationSitter_Model_Google
 {
-    protected $apiKey = "AIzaSyDeCWS-Xd_s5hB8pbewd_US0eFWCFGdw7w";
+    /** @var  string $apiKey */
+    protected $apiKey;
     protected $sourceLanguage = "en";
     protected $locale;
     protected $storeId;
@@ -12,6 +13,15 @@ class Etre_TranslationSitter_Model_Google
     {
         $this->setLocale(Mage::app()->getLocale()->getLocaleCode());
         $this->setStoreId(Mage::app()->getStore()->getId());
+//        /dd(Mage::getStoreConfig('system/translationsitter/googleApiKey'));
+    }
+
+    /**
+     * @param string $apiKey
+     */
+    public function setApiKey($apiKey)
+    {
+        $this->apiKey = $apiKey;
     }
 
     public function process($text, $code)
