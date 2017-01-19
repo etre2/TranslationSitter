@@ -103,6 +103,8 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
         $isPosting = !empty($this->getRequest()->getPost());
         if ($isPosting) {
             $this->processImport();
+            Mage::getSingleton('adminhtml/session')->addSuccess("Translations imported successfully.");
+            $this->_redirect('*/*/index');
         } else {
             $this->loadLayout();
             $this->_addContent($this->getLayout()->createBlock($this->BLOCK_TRANSLATION_IMPORT));
@@ -128,7 +130,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     {
         if ($this->uploadedFileHasProperName($inputFileId = 'translationsitter_source')) {
             try {
-                ini_set("display_errors",1);
+                ini_set("display_errors", 1);
                 $path = Mage::getBaseDir('var') . DS . 'etre_imported_translations' . DS;  //desitnation directory
                 /** Make the import directory if it doesn't exist */
                 $fname = strtotime('now') . '_' . $_FILES[$inputFileId]['name']; //file name
@@ -138,12 +140,36 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
                 $uploader->setAllowRenameFiles(true); //if true, uploaded file's name will be changed, if file with the same name already exists directory.
                 $uploader->setFilesDispersion(false);
                 if ($uploader->save($path, $fname)) {
-                    $file = PHPExcel_IOFactory::load($path.$fname);
-                    $activeSheet = $file->getActiveSheet();
-                    dd($activeSheet->toArray());
-                    $csv = new Varien_File_Csv();
-                    $csv->getData($path.$fname);
-                    dd($csv);
+                    $filePath = $path . $fname;
+                    $file = $this->loadFileToExcel($inputFileId, $filePath);
+                    $translationModel = Mage::getSingleton('etre_translationsitter/translations');
+                    $translationResource = $translationModel->getResource();
+                    $coreWriteConnection = Mage::getSingleton('core/resource')->getConnection('core_write');
+                    $translationTable = $translationResource->getMainTable();
+                    $fileDataRows = $this->excelToArrayWithHeaders($file);
+                    //Load multiple models at once
+                    $key_ids = [];
+                    foreach($fileDataRows as $key => $rowData){
+                        $key_ids[]=$rowData['key_id'];
+                    }
+                    /** @var /Etre_TranslationSitter_Model_Resource_Translations_Collection $translationCollection */
+                    $translationCollection = Mage::getModel('etre_translationsitter/translations')->getCollection();
+                    $translationCollection->addFieldToFilter('key_id', array('in' => $key_ids));
+
+                    //Update multiple models at once
+                    $transaction = Mage::getModel('core/resource_transaction');
+                    foreach($translationCollection as $translationModel){
+                        $fileRowData = $this->arrayKeyValueSearch($fileDataRows, 'key_id', $translationModel->getKeyId());
+                        if(empty($fileRowData)) continue;
+                        //dump("Before",$translationModel,$fileRowData);
+                        $fileRowData = array_shift($fileRowData);
+                        $translationModel->setTranslate($fileRowData['translation']);
+                        $translationModel->setLocale($fileRowData['locale']);
+                        $translationModel->setTranslationsitterSource($fileRowData['source']);
+                        //dd("after", $translationModel);
+                        $transaction->addObject($translationModel);
+                    }
+                    $transaction->save();
                 }
             } catch (Exception $e) {
                 echo 'Error Message: ' . $e->getMessage();
@@ -158,6 +184,55 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     protected function uploadedFileHasProperName($inputFileId = "")
     {
         return isset($_FILES[$inputFileId]['name']) && $_FILES[$inputFileId]['name'] != '';
+    }
+
+    /**
+     * @param $inputFileId
+     * @param $filePath
+     * @return PHPExcel
+     */
+    protected function loadFileToExcel($inputFileId, $filePath)
+    {
+        if ($_FILES[$inputFileId]['type'] == 'text/csv') {
+            $csvReader = new PHPExcel_Reader_CSV();
+            $csvReader->setDelimiter(',');
+            $csvReader->setEnclosure('');
+
+            $file = $csvReader->load($filePath);
+            return $file;
+        } else {
+            $file = PHPExcel_IOFactory::load($filePath);
+            return $file;
+        }
+    }
+
+    /**
+     * @param $file
+     * @return array
+     */
+    protected function excelToArrayWithHeaders($file)
+    {
+        $objWorksheet = $file->getActiveSheet();
+        $highestRow = $objWorksheet->getHighestRow();
+        $highestColumn = $objWorksheet->getHighestColumn();
+        /** Assume KEY_ID is in column one */
+        $key_idColumn = 'A1:A' . $highestRow;
+        /** Set format for key_id column so no decimals are used */
+        $objWorksheet->getStyle($key_idColumn)->getNumberFormat($key_idColumn)->setFormatCode('#');
+        $headingsArray = $objWorksheet->rangeToArray('A1:' . $highestColumn . '1', null, true, true, true);
+        $headingsArray = $headingsArray[1];
+        $r = -1;
+        $namedDataArray = array();
+        for ($row = 2; $row <= $highestRow; ++$row) {
+            $dataRow = $objWorksheet->rangeToArray('A' . $row . ':' . $highestColumn . $row, null, true, true, true);
+            if ((isset($dataRow[$row]['A'])) && ($dataRow[$row]['A'] > '')) {
+                ++$r;
+                foreach ($headingsArray as $columnKey => $columnHeading) {
+                    $namedDataArray[$r][strtolower($columnHeading)] = $dataRow[$row][$columnKey];
+                }
+            }
+        }
+        return $namedDataArray;
     }
 
     /**
@@ -270,5 +345,27 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     protected function _isAllowed()
     {
         return Mage::getSingleton('admin/session')->isAllowed('admin/system/etre_translationsitter');
+    }
+
+    /**
+     * @param $array
+     * @param $key
+     * @param $value
+     * @return array
+     */
+    protected function arrayKeyValueSearch($array, $key, $value)
+    {
+        $results = array();
+
+        if (is_array($array)) {
+            if (isset($array[$key]) && $array[$key] == $value) {
+                $results[] = $array;
+            }
+
+            foreach ($array as $subarray) {
+                $results = array_merge($results, $this->arrayKeyValueSearch($subarray, $key, $value));
+            }
+        }
+        return $results;
     }
 }
