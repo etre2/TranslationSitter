@@ -57,10 +57,10 @@ class Etre_TranslationSitter_Block_Log_Grid extends Mage_Adminhtml_Block_Widget_
             [
                 'header'  => $this->__('Store ID'),
                 'width'   => '50px',
-                'index'   => 'store_id',
-                'type'    => 'options',
                 'width'   => '70px',
-                'options' => Mage::getModel('core/store')->getCollection()->toOptionHash(),
+                'index'     => 'store_id',
+                'type'      => 'store',
+                'store_view'=> true,
             ]
         );
 

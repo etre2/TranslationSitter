@@ -111,7 +111,7 @@ class Etre_TranslationSitter_Helper_Data extends Mage_Core_Helper_Abstract
             'value' => null,
             'label' => $this->__("Select a module..."),
         ];
-        foreach($installedModules as $moduleNamespace => $moduleState):
+        foreach ($installedModules as $moduleNamespace => $moduleState):
             $options[] = [
                 'value' => $moduleNamespace,
                 'label' => $moduleNamespace,
@@ -128,16 +128,32 @@ class Etre_TranslationSitter_Helper_Data extends Mage_Core_Helper_Abstract
 
     public function getModuleFromTranslation($translationString)
     {
-        if(is_string($translationString)):
+        if (is_string($translationString)):
             $hasModuleDelimiter = strpos($translationString, '::') !== false;
-            if($hasModuleDelimiter):
+            if ($hasModuleDelimiter):
                 $parsedTranslation = explode('::', $translationString);
                 $moduleNamespace = $parsedTranslation[0];
                 $appearsToBeModuleNamespace = strpos($moduleNamespace, '_') !== false;
-                if($appearsToBeModuleNamespace) return $moduleNamespace;
+                if ($appearsToBeModuleNamespace) return $moduleNamespace;
             endif;
         endif;
 
         return false;
+    }
+
+    /**
+     * @param string $translationString
+     * @return string
+     * */
+    public function getStringToTranslateFromSourceTranslation($translationString = "")
+    {
+        $moduleFromTranslation = $this->getModuleFromTranslation($translationString);
+        if ($moduleFromTranslation):
+            $search = $moduleFromTranslation . '::';
+            $replace = '';
+            return $translationString = str_replace($search, $replace, $translationString);
+        else:
+            return $translationString;
+        endif;
     }
 }

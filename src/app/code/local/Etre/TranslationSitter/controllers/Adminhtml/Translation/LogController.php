@@ -149,8 +149,8 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
                     $fileDataRows = $this->excelToArrayWithHeaders($file);
                     //Load multiple models at once
                     $key_ids = [];
-                    foreach($fileDataRows as $key => $rowData){
-                        $key_ids[]=$rowData['key_id'];
+                    foreach ($fileDataRows as $key => $rowData) {
+                        $key_ids[] = $rowData['key_id'];
                     }
                     /** @var /Etre_TranslationSitter_Model_Resource_Translations_Collection $translationCollection */
                     $translationCollection = Mage::getModel('etre_translationsitter/translations')->getCollection();
@@ -158,9 +158,9 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
 
                     //Update multiple models at once
                     $transaction = Mage::getModel('core/resource_transaction');
-                    foreach($translationCollection as $translationModel){
+                    foreach ($translationCollection as $translationModel) {
                         $fileRowData = $this->arrayKeyValueSearch($fileDataRows, 'key_id', $translationModel->getKeyId());
-                        if(empty($fileRowData)) continue;
+                        if (empty($fileRowData)) continue;
                         //dump("Before",$translationModel,$fileRowData);
                         $fileRowData = array_shift($fileRowData);
                         $translationModel->setTranslate($fileRowData['translation']);
@@ -236,8 +236,47 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     }
 
     /**
-     *
+     * @param $array
+     * @param $key
+     * @param $value
+     * @return array
      */
+    protected function arrayKeyValueSearch($array, $key, $value)
+    {
+        $results = array();
+
+        if (is_array($array)) {
+            if (isset($array[$key]) && $array[$key] == $value) {
+                $results[] = $array;
+            }
+
+            foreach ($array as $subarray) {
+                $results = array_merge($results, $this->arrayKeyValueSearch($subarray, $key, $value));
+            }
+        }
+        return $results;
+    }
+
+    public function deleteAction()
+    {
+        $id = $this->getRequest()->getParam('id');
+        try {
+            $translation = Mage::getSingleton('etre_translationsitter/translations')->load($id);
+            $translation->delete();
+            $this->_getSession()->addSuccess(Mage::helper('etre_translationsitter')->__('Translation deleted.'));
+        } catch (Mage_Core_Exception $e) {
+            $this->_getSession()->addError($e->getMessage());
+        } catch (Exception $e) {
+            $this->_getSession()->addError(
+                Mage::helper('')->__('An error occurred while mass deleting items. Please review log and try again.')
+            );
+            Mage::logException($e);
+            return;
+
+        }
+        $this->_redirect('*/*/');
+    }
+
     public function massDeleteAction()
     {
         $ids = $this->getRequest()->getParam('ids');
@@ -336,7 +375,58 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
      */
     public function saveAction()
     {
-        dd("here");
+
+        $request = $this->getRequest();
+        $keyId = $request->getParam('key_id');
+        if (!empty($keyId)) {
+            $translation = Mage::getModel('etre_translationsitter/translations')->load($keyId);
+            if (!$translation->getData()) {
+                return $this->redirectReferrerWithError(Mage::helper('etre_translationsitter')->__("Model with id %s could not be loaded. It may have been removed.", $keyId));
+            }
+        } else {
+            $translation = Mage::getModel('etre_translationsitter/translations');
+        }
+        if (!$request->getParam('translate')) {
+            return $this->redirectReferrerWithError(Mage::helper('etre_translationsitter')->__("Translation string cannot be empty."));
+        } else {
+            $translation->setTranslate($request->getParam('translate'));
+        }
+        if (!$request->getParam('store_id')) {
+            return $this->redirectReferrerWithError(Mage::helper('etre_translationsitter')->__("Core Translations require that a store be selected."));
+        } else {
+            $store = Mage::getModel('core/store')->load($request->getParam('store_id'));
+            if (!$store->getId()) {
+                return $this->redirectReferrerWithError(Mage::helper('etre_translationsitter')->__("Selected store no longer exists."));
+            }
+            $translation->setStoreId($request->getParam('store_id'));
+        }
+        if (!$request->getParam('locale')) {
+            return $this->redirectReferrerWithError(Mage::helper('etre_translationsitter')->__("Translation language required."));
+        } else {
+            $translation->setLocale($request->getParam('locale'));
+        }
+        $isModuleSpecific = $request->getParam('is_module_specific') == 1;
+        if ($isModuleSpecific && $request->getParam('translation_module')) {
+            $stringToTranslate = $request->getParam('string') ? $request->getParam('string') : $translation->getString();
+            $sourceTranslation = Mage::helper('etre_translationsitter')->getStringToTranslateFromSourceTranslation($stringToTranslate);
+            $translation->setString($request->getParam('translation_module') . '::' . $sourceTranslation);
+        } elseif ($request->getParam('is_module_specific') == 0) {
+            $stringToTranslate = $request->getParam('string') ? $request->getParam('string') : $translation->getString();
+            $translation->setString($stringToTranslate);
+        }
+        try {
+            $userInfo = Mage::getSingleton('admin/session')->getUser()->getUsername() . " (ID:" . Mage::getSingleton('admin/session')->getUser()->getUserId() . ")";
+            $translation->setTranslationsitterSource(Mage::helper('etre_translationsitter')->__('Modified By %s',$userInfo));
+            $translation->save();
+            Mage::getSingleton('adminhtml/session')->addSuccess(Mage::helper('etre_translationsitter')->__('Translation updated'));
+            if($request->getParam('back')) {
+                return $this->_redirect('*/*/edit/', ['id' => $translation->getId()]);
+            }
+
+            return $this->_redirect('*/*/');
+        } catch (Exception $e) {
+            return $this->redirectReferrerWithError(Mage::helper('etre_translationsitter')->__('There was a problem saving the translation: %s', $e->getMessage()));
+        }
     }
 
     /**
@@ -345,27 +435,5 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     protected function _isAllowed()
     {
         return Mage::getSingleton('admin/session')->isAllowed('admin/system/etre_translationsitter');
-    }
-
-    /**
-     * @param $array
-     * @param $key
-     * @param $value
-     * @return array
-     */
-    protected function arrayKeyValueSearch($array, $key, $value)
-    {
-        $results = array();
-
-        if (is_array($array)) {
-            if (isset($array[$key]) && $array[$key] == $value) {
-                $results[] = $array;
-            }
-
-            foreach ($array as $subarray) {
-                $results = array_merge($results, $this->arrayKeyValueSearch($subarray, $key, $value));
-            }
-        }
-        return $results;
     }
 }
