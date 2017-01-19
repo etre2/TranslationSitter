@@ -27,6 +27,7 @@ class Etre_TranslationSitter_Block_Log_Import_Form extends Mage_Adminhtml_Block_
         $fieldset->addField('translation_data', 'file', [
             'name'     => 'translationsitter_source',
             'label'    => $this->_getHelper()->__('Import Source'),
+            'after_element_html' => '<p class="nm"><small>Compatible with Excel documents.</small></p>',
             'required' => false,
         ]);
 
