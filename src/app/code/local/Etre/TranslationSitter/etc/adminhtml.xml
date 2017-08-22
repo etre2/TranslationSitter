@@ -17,6 +17,10 @@
                     <title>TranslationSitter</title>
                     <action>adminhtml/translation_log</action>
                     <children>
+                        <manage>
+                            <title>Manage Translations</title>
+                            <action>adminhtml/translation_log</action>
+                        </manage>
                         <settings>
                             <title>Configure Module</title>
                             <action>adminhtml/system_config/edit/section/system/</action>
@@ -36,6 +40,10 @@
                                 <title>TranslationSitter (Show Menu Item)</title>
                                 <sort_order>0</sort_order>
                                 <children>
+                                    <manage>
+                                        <title><![CDATA[Show & Enable "Manage Translations" Menu Item]]></title>
+                                        <sort_order>0</sort_order>
+                                    </manage>
                                     <settings>
                                         <title>Show "Settings" Menu Item</title>
                                         <sort_order>0</sort_order>
