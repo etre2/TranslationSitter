@@ -13,7 +13,6 @@ class Etre_TranslationSitter_Model_Google
     {
         $this->setLocale(Mage::app()->getLocale()->getLocaleCode());
         $this->setStoreId(Mage::app()->getStore()->getId());
-//        /dd(Mage::getStoreConfig('system/translationsitter/googleApiKey'));
     }
 
     /**

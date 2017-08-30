@@ -12,6 +12,7 @@ class Etre_TranslationSitter_Block_Log_Import_Form extends Mage_Adminhtml_Block_
     protected function _prepareForm()
     {
         $modelTitle = $this->_getModelTitle();
+        /** @var Varien_Data_Form $form */
         $form = new Varien_Data_Form([
             'id'     => 'importForm',
             'action' => $this->getUrl('*/*/import'),
@@ -24,11 +25,45 @@ class Etre_TranslationSitter_Block_Log_Import_Form extends Mage_Adminhtml_Block_
             'class'  => 'fieldset-wide',
         ]);
 
+
+        $field =$fieldset->addField('store_id', 'select', array(
+            'name'      => 'store_id',
+            'label'     => Mage::helper('cms')->__('Store View'),
+            'title'     => Mage::helper('cms')->__('Store View'),
+            'required'  => true,
+            'values'    => Mage::getSingleton('adminhtml/system_store')->getStoreValuesForForm(false, true),
+        ));
+        $renderer = $this->getLayout()->createBlock('adminhtml/store_switcher_form_renderer_fieldset_element');
+
+        $field->setRenderer($renderer);
+
+        $fieldset->addField('unset_module_translation', 'select',[
+           'name' => 'unset_module_translation',
+           'label' => 'Remove module matches?',
+           'value'  => '0',
+           'values' => array(
+               '-1'=>'Please Select..',
+               '1' => array(
+                   'value'=> '1',
+                   'label' => 'Yes'
+               ),
+               '2' => array(
+                   'value'=> '0',
+                   'label' => 'No'
+               ),
+
+           ),
+           'after_element_html' => $this->__('<p class="nm"><small>If translation detected without module prefix (i.e. <em><u><strong>Module_Namespace::</strong></u>Translation string</em>), replace the module-specific translations. </small></p>'),
+           'class'     => 'required-entry',
+           'required'  => true,
+        ]);
+
         $fieldset->addField('translation_data', 'file', [
             'name'     => 'translationsitter_source',
             'label'    => $this->_getHelper()->__('Import Source'),
             'after_element_html' => '<p class="nm"><small>Compatible with Excel documents.</small></p>',
-            'required' => false,
+            'class'     => 'required-entry',
+            'required'  => true,
         ]);
 
         $form->setUseContainer(true);
