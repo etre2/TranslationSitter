@@ -1,6 +1,6 @@
 # TranslationSitter
 
-##Features
+## Features
 
 * Log strings that are determined to not have a translation
 * Turn on Google API Translations so that end-users never see the wrong language
