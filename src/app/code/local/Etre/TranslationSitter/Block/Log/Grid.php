@@ -39,6 +39,7 @@ class Etre_TranslationSitter_Block_Log_Grid extends Mage_Adminhtml_Block_Widget_
     {
         $collection = Mage::getModel('etre_translationsitter/translations')->getCollection();
         $this->setCollection($collection);
+
         return parent::_prepareCollection();
     }
 
@@ -90,7 +91,7 @@ class Etre_TranslationSitter_Block_Log_Grid extends Mage_Adminhtml_Block_Widget_
             ]
         );
 
-        $this->addColumn('Translation',
+        $this->addColumn('translate',
             [
                 'header' => $this->__('Translation'),
                 'width'  => '200px',
@@ -117,5 +118,46 @@ class Etre_TranslationSitter_Block_Log_Grid extends Mage_Adminhtml_Block_Widget_
             'url'   => $this->getUrl('*/*/massDelete'),
         ]);
         return $this;
+    }
+
+    /**
+     * Retrieve Headers row array for Export
+     *
+     * @return array
+     */
+    protected function _getExportHeaders()
+    {
+        $row = array();
+        foreach ($this->_columns as $column) {
+            if (!$column->getIsSystem()) {
+                $row[] = $column->getIndex();
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * Write item data to csv export file
+     *
+     * @param Varien_Object $item
+     * @param Varien_Io_File $adapter
+     */
+    protected function _exportCsvItem(Varien_Object $item, Varien_Io_File $adapter)
+    {
+        $row = array();
+        foreach ($this->_columns as $column) {
+            if (!$column->getIsSystem()) {
+                if(($column->getIndex()=='store_id')){
+                    $row[] = $item->getStoreId();
+                }else {
+                    $row[] = $column->getRowFieldExport($item);
+                }
+            }
+        }
+
+        $adapter->streamWriteCsv(
+            Mage::helper("core")->getEscapedCSVData($row)
+        );
     }
 }

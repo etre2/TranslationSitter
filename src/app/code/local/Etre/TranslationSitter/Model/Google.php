@@ -2,6 +2,7 @@
 
 class Etre_TranslationSitter_Model_Google
 {
+    const CODE_INTEGRITY_CONSTRAINT = 23000;
     /** @var  string $apiKey */
     protected $apiKey;
     protected $sourceLanguage = "en";
@@ -13,6 +14,7 @@ class Etre_TranslationSitter_Model_Google
     {
         $this->setLocale(Mage::app()->getLocale()->getLocaleCode());
         $this->setStoreId(Mage::app()->getStore()->getId());
+        $this->setApiKey(Mage::getStoreConfig('system/translationsitter/googleApiKey'));
     }
 
     /**
@@ -62,28 +64,28 @@ class Etre_TranslationSitter_Model_Google
     {
         try {
             $translated = $this->getApiTranslation($text, $code);
-            if (isset($translated)):
+
+            if (!empty($translated)):
                 $this->logTranslation($code, $translated, "Translation Sitter: Google API");
             else:
                 throw new Exception($this->__("There was a problem getting the translation from Google: {$translated}"));
             endif;
-        } catch (Exception $e) {
-            $integrityConstraintCode = 23000;
-            $isNotIntegrityConstraintViolation = $e->getCode() !== $integrityConstraintCode;
-            if ($isNotIntegrityConstraintViolation):
-                /** Magento will not know that new translations have been inserted until the next page load.
-                 * We can expect integrity constraint violations because of this. When that happens, let's just keep going */
-                $translated = $text;
-            else:
-                Mage::logException($e);
-                $translated = $text;
+        } catch (Exception $exception) {
+            if (!$this->integirtyConstraintViolatio($exception)):
+                Mage::logException($exception);
             endif;
+            $translated = $text;
         }
         return $translated;
     }
 
+    /**
+     * @param string $text
+     * @return string
+     */
     protected function getApiTranslation($text = "")
     {
+        if(empty($text)) return "";
 
         $stringToTranslate = urlencode($text);
         $destinationLanguage = strtok($this->getLocale(), "_");
@@ -99,7 +101,8 @@ class Etre_TranslationSitter_Model_Google
                 return $translated = $googleTranslation->data->translations[0]->translatedText;
             endif;
         endif;
-        return false;
+
+        return "";
     }
 
     /**
@@ -167,6 +170,15 @@ class Etre_TranslationSitter_Model_Google
     public function setStoreId($storeId)
     {
         $this->storeId = $storeId;
+    }
+
+    /**
+     * @param $exception
+     * @return bool
+     */
+    protected function integirtyConstraintViolatio($exception): bool
+    {
+        return $exception->getCode() !== self::CODE_INTEGRITY_CONSTRAINT;
     }
 
 }

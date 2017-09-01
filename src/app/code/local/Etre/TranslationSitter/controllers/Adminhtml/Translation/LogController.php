@@ -6,10 +6,10 @@
 class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Adminhtml_Controller_Action
 {
     const SQL_LIKE_MODULE = '%_%::';
+    const ZEND_DB_BINDER = '?';
     protected $newTranslations;
     protected $updatedByKey = [];
     protected $hasError = false;
-    const ZEND_DB_BINDER = '?';
     /**
      * @var string
      */
@@ -31,7 +31,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      * @var string
      */
-    protected $EXPORT_FILE_NAME = 'captured_missing_translations';
+    protected $EXPORT_FILE_NAME = 'absent_template_translations';
 
     /**
      * @var
@@ -136,6 +136,14 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     }
 
     /**
+     * @return bool
+     */
+    protected function isAdminStore(): bool
+    {
+        return intval($this->getRequest()->getParam('store_id')) !== 0;
+    }
+
+    /**
      *
      */
     protected function processImport()
@@ -187,6 +195,22 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     protected function validFileName($inputFileId = "")
     {
         return isset($_FILES[$inputFileId]['name']) && $_FILES[$inputFileId]['name'] != '';
+    }
+
+    /**
+     * @param $fileFieldName
+     * @return Varien_File_Uploader
+     */
+    protected function getUploader(
+        $fileFieldName
+    ): Varien_File_Uploader {
+        $uploader = new Varien_File_Uploader($fileFieldName);
+        $uploader->setAllowedExtensions(array('csv', 'xls', 'xlsx'));
+        $uploader->setAllowCreateFolders(true);
+        $uploader->setAllowRenameFiles(true);
+        $uploader->setFilesDispersion(false);
+
+        return $uploader;
     }
 
     /**
@@ -259,7 +283,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
              * but in two different formats.
              */
 
-            $rowArray[$row][$sourceColumnId] = $this->stringifyIfBoolean($rowArray[$row][$sourceColumnId]);
+            $rowArray[$row][$sourceColumnId]      = $this->stringifyIfBoolean($rowArray[$row][$sourceColumnId]);
             $rowArray[$row][$translationColumnId] = $this->stringifyIfBoolean($rowArray[$row][$translationColumnId]);
 
 
@@ -274,13 +298,134 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     }
 
     /**
+     * @param $headingsArray
+     * @param $highestRow
+     * @param $worksheet
+     * @return PHPExcel_Style
+     */
+    protected function getColumnStyle(
+        $columnName,
+        $headingsArray,
+        $highestRow,
+        $worksheet
+    ) {
+        $sourceColumnId = $this->getColumnLetter($columnName, $headingsArray);
+        $sourceColumn   = sprintf('%s1:%s%s', $sourceColumnId, $sourceColumnId, $highestRow);
+
+        return $worksheet->getStyle($sourceColumn);
+    }
+
+    /**
+     * @param $headingsArray
+     * @return false|int|string
+     */
+    protected function getColumnLetter(
+        $columnName,
+        $headingsArray
+    ) {
+        $sourceColumnId = array_search($columnName, $headingsArray);
+
+        return $sourceColumnId;
+    }
+
+    /**
+     * @param $sourceColumnId
+     * @return int
+     */
+    protected function getColumnIndex(
+        $sourceColumnId
+    ): int {
+        return PHPExcel_Cell::columnIndexFromString($sourceColumnId) - 1;
+    }
+
+    /**
+     * @param string
+     */
+    protected function stringifyIfBoolean($string)
+    {
+        if (is_bool($string) && $string) {
+            $string = 'TRUE';
+        } elseif (is_bool($string) && !$string) {
+            $string = 'FALSE';
+        }
+
+        return $string;
+    }
+
+    /**
+     * @return array
+     */
+    protected function getKeyIds(): array
+    {
+        $keyIds = [];
+        foreach ($this->newTranslations as $key => $rowData) {
+            if (!is_numeric($rowData['key_id'])) {
+                continue;
+            }
+            $keyIds[] = $rowData['key_id'];
+        }
+
+        return $keyIds;
+    }
+
+    /**
+     * @param $keyIds
+     * return void;
+     */
+    protected function updateByKey(
+        $keyIds
+    ) {
+
+        /** @var /Etre_TranslationSitter_Model_Resource_Translations_Collection $translationsByKey */
+        $translationsByKey = Mage::getModel('etre_translationsitter/translations')
+            ->getCollection()
+            ->addFieldToFilter('key_id', array('in' => $keyIds));
+
+        if ($translationsByKey->getSize() <= 0) {
+            return;
+        }
+
+        $this->updateItemsByKey($translationsByKey);
+    }
+
+    /**
+     * @param $translationCollection
+     */
+    protected function updateItemsByKey(
+        $translationCollection
+    ) {
+
+        $transaction = Mage::getModel('core/resource_transaction');
+        foreach ($translationCollection as $translationModel) {
+            $fileRowData = $this->arrayKeyValueSearch($this->newTranslations, 'key_id', $translationModel->getKeyId());
+            if (!empty($fileRowData)) {
+                $fileRowData = array_shift($fileRowData);
+                $translationModel->setTranslate($fileRowData['translation']);
+                $translationModel->setLocale($fileRowData['locale']);
+                $translationModel->setTranslationsitterSource($fileRowData['source']);
+                $transaction->addObject($translationModel);
+
+                $this->updatedByKey[] = $translationModel->getKeyId();
+                continue;
+            }
+        }
+        try {
+            $transaction->save();
+        } catch (Exception $exception) {
+            $this->addError(
+                $exception,
+                "There was a problem inserting the new records. Please check Magento logs for more info."
+            );
+        }
+    }
+
+    /**
      * @param $array
      * @param $key
      * @param $value
      * @return array
      */
-    protected
-    function arrayKeyValueSearch(
+    protected function arrayKeyValueSearch(
         $array,
         $key,
         $value
@@ -298,6 +443,170 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
         }
 
         return $results;
+    }
+
+    /**
+     * @param Exception $exception
+     * @param $errorMessage
+     */
+    protected function addError(
+        $exception,
+        $errorMessage
+    ) {
+        $this->hasError = true;
+        Mage::logException($exception);
+        $this->_getSession()->addError(
+            Mage::helper('etre_translationsitter')->__($errorMessage)
+        );
+    }
+
+    /**
+     * @param $newTranslations
+     * @param $keyIds
+     */
+    protected function deleteOld($newTranslations, $keyIds)
+    {
+        foreach ($newTranslations as $updatedTranslation) {
+            $updatedTranslation = (new Varien_Object())->setData($updatedTranslation);
+
+            if (!$this->hasRequiredFields($updatedTranslation)) {
+                continue;
+            }
+
+            $unboundSourceString = str_replace(self::ZEND_DB_BINDER, '_', $updatedTranslation->getSource());
+
+            $stringLookup = [
+                ['like' => $unboundSourceString],
+            ];
+
+            if ($this->replaceModuleTranslations()) {
+                $moduleStringLookup = ['like' => $this->getLikeModuleString($unboundSourceString)];
+                $stringLookup[]     = $moduleStringLookup;
+            }
+
+            /** @var Etre_TranslationSitter_Model_Resource_Translations_Collection $oldTranslations */
+            $oldTranslations = Mage::getResourceModel('etre_translationsitter/translations_collection')
+                ->addFieldToFilter('store_id', array('eq' => $this->getRequest()->getParam('store_id')))
+                ->addFieldToFilter(
+                    'string',
+                    $stringLookup
+                );
+
+            if ($oldTranslations->getSize() > 0) {
+                try {
+                    foreach ($oldTranslations as $oldTranslation) {
+                        if (!($updatedTranslation->getSource() === $this->stringWithoutModule($oldTranslation))) {
+                            continue;
+                        }
+                        $oldTranslation->delete();
+                    }
+                } catch (Exception $exception) {
+                    $this->addError($exception, "There was a problem deleting some old records.");
+                }
+            }
+        }
+    }
+
+    /**
+     * @param $updatedTranslation
+     * @return bool
+     */
+    protected function hasRequiredFields(
+        $updatedTranslation
+    ): bool {
+        return $updatedTranslation->getSource() && $updatedTranslation->getTranslation(
+            ) && $updatedTranslation->getLocale();
+    }
+
+    /**
+     * @return int
+     */
+    protected function replaceModuleTranslations(): int
+    {
+        return (int)$this->getRequest()->getParam('unset_module_translation');
+    }
+
+    /**
+     * @param $sourceText
+     * @return string
+     */
+    protected function getLikeModuleString(
+        $sourceText
+    ): string {
+        return sprintf(
+            '%s%s',
+            self::SQL_LIKE_MODULE,
+            $sourceText
+        );
+    }
+
+    /**
+     * @param $oldTranslation
+     * @return mixed
+     */
+    protected function stringWithoutModule(
+        $oldTranslation
+    ) {
+        return array_reverse(explode('::', $oldTranslation->getString(), 2))[0];
+    }
+
+    /**
+     * @param $keyIds
+     * @param $fileDataRows
+     */
+    protected function insertNew()
+    {
+        $updateable  = $this->getUpdatableTranslations();
+        $updated     = [];
+        $transaction = Mage::getModel('core/resource_transaction');
+        foreach ($updateable as $updatedTranslation) {
+            $sourceString = $updatedTranslation['source'];
+
+            /** Avoid duplication errors */
+            if (in_array($sourceString, $updated)) {
+                continue;
+            }
+
+            $updated[] = $sourceString;
+
+            $translation = Mage::getModel('etre_translationsitter/translations');
+            $translation->setStoreId($this->getRequest()->getParam('store_id'));
+            $translation->setString($sourceString);
+            $translation->setTranslate($updatedTranslation['translation']);
+            $translation->setLocale($updatedTranslation['locale']);
+            $translation->setTranslationsitterSource(
+                $updatedTranslation['translation_source'] ? $updatedTranslation['translation_source'] : 'Import'
+            );
+            $translation->setCrcString(crc32($sourceString));
+
+            $transaction->addObject($translation);
+        }
+        try {
+            $transaction->save();
+        } catch (Exception $exception) {
+            $this->addError($exception, "Skipping \"{$translation->getString()}\". This may be a duplicate entry");
+        }
+
+    }
+
+    /**
+     * @return array
+     */
+    protected function getUpdatableTranslations(): array
+    {
+        if (empty($this->updatedByKey)) {
+            return $this->newTranslations;
+        }
+
+        $updatedKeys = $this->updatedByKey;
+        $updateable  = array_filter(
+            $this->newTranslations,
+            function ($newTranslations) use ($updatedKeys) {
+                return !in_array($newTranslations['obj_id'], $updatedKeys);
+            }
+        );
+
+        return $updateable;
     }
 
     public function deleteAction()
@@ -321,8 +630,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
         $this->_redirect('*/*/');
     }
 
-    public
-    function massDeleteAction()
+    public function massDeleteAction()
     {
         $ids = $this->getRequest()->getParam('ids');
         if (!is_array($ids)) {
@@ -357,8 +665,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      *
      */
-    public
-    function gridAction()
+    public function gridAction()
     {
         $this->loadLayout();
         $this->getResponse()->setBody(
@@ -369,12 +676,11 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      * @return Mage_Adminhtml_Controller_Action
      */
-    public
-    function exportAction()
+    public function exportAction()
     {
         switch ($this->getRequest()->getParam("format")):
-            case "xml":
-                return $this->exportXml();
+            case "xlsx":
+                return $this->exportXlsx();
                 break;
             case "csv":
                 return $this->exportCsv();
@@ -387,8 +693,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      * @return Mage_Adminhtml_Controller_Action
      */
-    public
-    function exportXml()
+    public function exportXlsx()
     {
         $fileName = $this->EXPORT_FILE_NAME.'.xml';
         if ($grid = $this->getLayout()->createBlock($this->BLOCK_TRANSLATION_GRID)):
@@ -402,8 +707,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
      * @param $message
      * @return Mage_Adminhtml_Controller_Action
      */
-    protected
-    function redirectReferrerWithError(
+    protected function redirectReferrerWithError(
         $message
     ) {
         Mage::getSingleton("adminhtml/session")->addError($message);
@@ -414,10 +718,11 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      * @return Mage_Adminhtml_Controller_Action
      */
-    public
-    function exportCsv()
+    public function exportCsv()
     {
-        $fileName = $this->EXPORT_FILE_NAME.'.csv';
+        $fileName = sprintf('%s-%s.csv', $this->EXPORT_FILE_NAME, Mage::getModel('core/date')->date('YmdHis'));
+
+        /** @var Etre_TranslationSitter_Block_Log_Grid $grid */
         if ($grid = $this->getLayout()->createBlock($this->BLOCK_TRANSLATION_GRID)):
             $this->_prepareDownloadResponse($fileName, $grid->getCsvFile());
         else:
@@ -428,8 +733,7 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      *
      */
-    public
-    function saveAction()
+    public function saveAction()
     {
 
         $request = $this->getRequest();
@@ -516,335 +820,8 @@ class Etre_TranslationSitter_Adminhtml_Translation_LogController extends Mage_Ad
     /**
      * @return bool
      */
-    protected
-    function _isAllowed()
+    protected function _isAllowed()
     {
         return Mage::getSingleton('admin/session')->isAllowed('admin/system/etre_translationsitter');
-    }
-
-    /**
-     * @param $fileFieldName
-     * @return Varien_File_Uploader
-     */
-    protected
-    function getUploader(
-        $fileFieldName
-    ): Varien_File_Uploader {
-        $uploader = new Varien_File_Uploader($fileFieldName);
-        $uploader->setAllowedExtensions(array('csv', 'xls', 'xlsx'));
-        $uploader->setAllowCreateFolders(true);
-        $uploader->setAllowRenameFiles(true);
-        $uploader->setFilesDispersion(false);
-
-        return $uploader;
-    }
-
-    /**
-     * @return int
-     */
-    protected
-    function replaceModuleTranslations(): int
-    {
-        return (int)$this->getRequest()->getParam('unset_module_translation');
-    }
-
-    /**
-     * @param $translationCollection
-     */
-    protected
-    function updateItemsByKey(
-        $translationCollection
-    ) {
-
-        $transaction = Mage::getModel('core/resource_transaction');
-        foreach ($translationCollection as $translationModel) {
-            $fileRowData = $this->arrayKeyValueSearch($this->newTranslations, 'key_id', $translationModel->getKeyId());
-            if (!empty($fileRowData)) {
-                $fileRowData = array_shift($fileRowData);
-                $translationModel->setTranslate($fileRowData['translation']);
-                $translationModel->setLocale($fileRowData['locale']);
-                $translationModel->setTranslationsitterSource($fileRowData['source']);
-                $transaction->addObject($translationModel);
-
-                $this->updatedByKey[] = $translationModel->getKeyId();
-                continue;
-            }
-        }
-        try {
-            $transaction->save();
-        } catch (Exception $exception) {
-            $this->addError(
-                $exception,
-                "There was a problem inserting the new records. Please check Magento logs for more info."
-            );
-        }
-    }
-
-    /**
-     * @param $keyIds
-     * @param $fileDataRows
-     */
-    protected
-    function insertNew()
-    {
-        $updateable  = $this->getUpdatableTranslations();
-        $updated     = [];
-        $transaction = Mage::getModel('core/resource_transaction');
-        foreach ($updateable as $updatedTranslation) {
-            $sourceString = $updatedTranslation['source'];
-
-            /** Avoid duplication errors */
-            if (in_array($sourceString, $updated)) {
-                continue;
-            }
-
-            $updated[] = $sourceString;
-
-            $translation = Mage::getModel('etre_translationsitter/translations');
-            $translation->setStoreId($this->getRequest()->getParam('store_id'));
-            $translation->setString($sourceString);
-            $translation->setTranslate($updatedTranslation['translation']);
-            $translation->setLocale($updatedTranslation['locale']);
-            $translation->setTranslationsitterSource(
-                $updatedTranslation['translation_source'] ? $updatedTranslation['translation_source'] : 'Import'
-            );
-            $translation->setCrcString(crc32($sourceString));
-
-            $transaction->addObject($translation);
-        }
-        try {
-            $transaction->save();
-        } catch (Exception $exception) {
-            $this->addError($exception, "Skipping \"{$translation->getString()}\". This may be a duplicate entry");
-        }
-
-    }
-
-    /**
-     * @param $keyIds
-     * return void;
-     */
-    protected
-    function updateByKey(
-        $keyIds
-    ) {
-
-        /** @var /Etre_TranslationSitter_Model_Resource_Translations_Collection $translationsByKey */
-        $translationsByKey = Mage::getModel('etre_translationsitter/translations')
-            ->getCollection()
-            ->addFieldToFilter('key_id', array('in' => $keyIds));
-
-        if ($translationsByKey->getSize() <= 0) {
-            return;
-        }
-
-        $this->updateItemsByKey($translationsByKey);
-    }
-
-    /**
-     * @param $updatedTranslation
-     * @return bool
-     */
-    protected
-    function hasRequiredFields(
-        $updatedTranslation
-    ): bool {
-        return $updatedTranslation->getSource() && $updatedTranslation->getTranslation(
-            ) && $updatedTranslation->getLocale();
-    }
-
-    /**
-     * @param $sourceText
-     * @return string
-     */
-    protected
-    function getLikeModuleString(
-        $sourceText
-    ): string {
-        return sprintf(
-            '%s%s',
-            self::SQL_LIKE_MODULE,
-            $sourceText
-        );
-    }
-
-    /**
-     * @param $newTranslations
-     * @param $keyIds
-     */
-    protected function deleteOld($newTranslations, $keyIds)
-    {
-        foreach ($newTranslations as $updatedTranslation)
-        {
-            $updatedTranslation = (new Varien_Object())->setData($updatedTranslation);
-
-            if (!$this->hasRequiredFields($updatedTranslation)) {
-                continue;
-            }
-
-            $unboundSourceString = str_replace(self::ZEND_DB_BINDER, '_', $updatedTranslation->getSource());
-
-            $stringLookup = [
-                ['like' => $unboundSourceString],
-            ];
-
-            if ($this->replaceModuleTranslations()) {
-                $moduleStringLookup = ['like' => $this->getLikeModuleString($unboundSourceString)];
-                $stringLookup[]     = $moduleStringLookup;
-            }
-
-            /** @var Etre_TranslationSitter_Model_Resource_Translations_Collection $oldTranslations */
-            $oldTranslations = Mage::getResourceModel('etre_translationsitter/translations_collection')
-                ->addFieldToFilter('store_id', array('eq' => $this->getRequest()->getParam('store_id')))
-                ->addFieldToFilter(
-                    'string',
-                    $stringLookup
-                );
-
-            if ($oldTranslations->getSize() > 0) {
-                try {
-                    foreach ($oldTranslations as $oldTranslation) {
-                        if (!($updatedTranslation->getSource() === $this->stringWithoutModule($oldTranslation))) {
-                            continue;
-                        }
-                        $oldTranslation->delete();
-                    }
-                } catch (Exception $exception) {
-                    $this->addError($exception, "There was a problem deleting some old records.");
-                }
-            }
-        }
-    }
-
-    /**
-     * @return array
-     */
-    protected
-    function getUpdatableTranslations(): array
-    {
-        if (empty($this->updatedByKey)) {
-            return $this->newTranslations;
-        }
-
-        $updatedKeys = $this->updatedByKey;
-        $updateable  = array_filter(
-            $this->newTranslations,
-            function ($newTranslations) use ($updatedKeys) {
-                return !in_array($newTranslations['obj_id'], $updatedKeys);
-            }
-        );
-
-        return $updateable;
-    }
-
-    /**
-     * @return array
-     */
-    protected
-    function getKeyIds(): array
-    {
-        $keyIds = [];
-        foreach ($this->newTranslations as $key => $rowData) {
-            if (!is_numeric($rowData['key_id'])) {
-                continue;
-            }
-            $keyIds[] = $rowData['key_id'];
-        }
-
-        return $keyIds;
-    }
-
-    /**
-     * @param Exception $exception
-     * @param $errorMessage
-     */
-    protected
-    function addError(
-        $exception,
-        $errorMessage
-    ) {
-        $this->hasError = true;
-        Mage::logException($exception);
-        $this->_getSession()->addError(
-            Mage::helper('etre_translationsitter')->__($errorMessage)
-        );
-    }
-
-    /**
-     * @return bool
-     */
-    protected
-    function isAdminStore(): bool
-    {
-        return intval($this->getRequest()->getParam('store_id')) !== 0;
-    }
-
-    /**
-     * @param $oldTranslation
-     * @return mixed
-     */
-    protected
-    function stringWithoutModule(
-        $oldTranslation
-    ) {
-        return array_reverse(explode('::', $oldTranslation->getString(), 2))[0];
-    }
-
-    /**
-     * @param $headingsArray
-     * @param $highestRow
-     * @param $worksheet
-     * @return PHPExcel_Style
-     */
-    protected
-    function getColumnStyle(
-        $columnName,
-        $headingsArray,
-        $highestRow,
-        $worksheet
-    ) {
-        $sourceColumnId = $this->getColumnLetter($columnName, $headingsArray);
-        $sourceColumn   = sprintf('%s1:%s%s', $sourceColumnId, $sourceColumnId, $highestRow);
-
-        return $worksheet->getStyle($sourceColumn);
-    }
-
-    /**
-     * @param $headingsArray
-     * @return false|int|string
-     */
-    protected
-    function getColumnLetter(
-        $columnName,
-        $headingsArray
-    ) {
-        $sourceColumnId = array_search($columnName, $headingsArray);
-
-        return $sourceColumnId;
-    }
-
-    /**
-     * @param $sourceColumnId
-     * @return int
-     */
-    protected
-    function getColumnIndex(
-        $sourceColumnId
-    ): int {
-        return PHPExcel_Cell::columnIndexFromString($sourceColumnId) - 1;
-    }
-
-    /**
-     * @param string
-     */
-    protected function stringifyIfBoolean($string)
-    {
-        if (is_bool($string) && $string) {
-            $string = 'TRUE';
-        } elseif (is_bool($string) && !$string) {
-            $string = 'FALSE';
-        }
-
-        return $string;
     }
 }

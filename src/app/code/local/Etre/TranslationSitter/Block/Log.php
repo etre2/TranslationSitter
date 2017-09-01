@@ -20,15 +20,16 @@ class Etre_TranslationSitter_Block_Log extends Mage_Adminhtml_Block_Widget_Grid_
             'onclick' => "setLocation('{$this->getImportUrl()}')",
             'class'   => $this->__('add'),
         ]);
+
         $this->addButton("export-csv", [
             'label'   => $this->__('Export CSV'),
             'onclick' => "setLocation('{$this->getExportUrlByFormat("csv")}')",
             'class'   => $this->__('export'),
         ]);
 
-        $this->addButton("export-xml", [
-            'label'   => $this->__('Export XML'),
-            'onclick' => "setLocation('{$this->getExportUrlByFormat("xml")}')",
+        $this->addButton("export-excel", [
+            'label'   => $this->__('Export Excel'),
+            'onclick' => "setLocation('{$this->getExportUrlByFormat("xlsx")}')",
             'class'   => $this->__('export'),
         ]);
         parent::__construct();
